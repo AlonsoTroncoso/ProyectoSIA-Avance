@@ -1,14 +1,16 @@
 
-package administrarcontrato;
+package administrarcontratos;
 
-import java.util.*;
 import java.io.*;
+import java.util.*;
+import javax.swing.SwingUtilities;
 
-public class AdministrarContrato {
-
-    static ArrayList<Cliente> clientes = new ArrayList();
-    static HashMap<String, Cliente> clientesPorRut = new HashMap();
-    static ArrayList<Plan> planesDisponibles = new ArrayList(); 
+// ------------------- CLASE PRINCIPAL ------------------- //
+public class administrarContratos { 
+// Estructuras principales de almacenamiento  
+    static ArrayList<Cliente> clientes = new ArrayList(); // Lista de clientes
+    static HashMap<String, Cliente> clientesPorRut = new HashMap(); // Búsqueda rápida por rut
+    static ArrayList<Plan> planesDisponibles = new ArrayList(); // Lista de planes disponibles 
             
     public static void datosEjemplo(){
         
@@ -48,426 +50,321 @@ public class AdministrarContrato {
 
     }
     
-    public static void insertarCliente(BufferedReader br) throws IOException{
-        System.out.println("Insertando nuevo Cliente...\n");
-        System.out.println("Ingrese nombre del cliente: \n");
-        String nombreNuevo = br.readLine();
-        System.out.println("Ingrese edad del cliente: \n");
-        int edadNueva = Integer.parseInt(br.readLine());
-        System.out.println("Ingrese rut del cliente(11.111.111-1): \n");
-        String rutNuevo = br.readLine();
-
+    // ================= FUNCIONES PARA CLIENTES ================= //
+    
+    public static boolean insertarCliente(String nombreNuevo, int edadNueva, String rutNuevo) throws IOException{
+        
         if (clientesPorRut.containsKey(rutNuevo)){
-            System.out.println("Este cliente ya existe, cancelando insercion...\n");
-            return;
+            return false;
         }
     
         Cliente clienteNuevo = new Cliente(nombreNuevo,edadNueva,rutNuevo);
         clientes.add(clienteNuevo);
         clientesPorRut.put(clienteNuevo.getRut(),clienteNuevo);
-        System.out.println("Insercion de cliente ("+ clienteNuevo.getRut() + ") finalizada!\n");
+        return true;
     }
     
-    static void listarClientes(
-            ArrayList<Cliente> clientes,
-            BufferedReader lector
-    ) throws IOException {
-        
-        if(clientes.isEmpty()) 
-            System.out.println("No hay clientes registrados!");
-
-        else {
-            System.out.println("====== LISTADO DE CLIENTES ======");
-            System.out.println("\nMostrar tambien aquellos con contrato? (s/n):");
-            String respuesta = lector.readLine();
-            boolean mostrarContratos = respuesta.equalsIgnoreCase("S");
-            
-            for(Cliente c : clientes) {
-                c.mostrarCliente(mostrarContratos);
-                System.out.println("============");
-            }            
+    //los listar es bastante comodo usarlo que retorne string, así retorno el texto altiro que quiero que muestre
+    //y al menos siento que se ve mas comodo y mas limpio
+    
+    public static String listarClientes(boolean mostrarContratos) {
+        if (clientes.isEmpty()) {
+            return "No hay clientes registrados.";
         }
-    }
-    
-    static void eliminarClientes(
-            ArrayList<Cliente> clientes,
-            HashMap<String, Cliente> clientesPorRut,
-            BufferedReader lector
-    ) throws IOException {
-        
-        System.out.println("Ingresa el rut a eliminar:");
-        String rut = lector.readLine();
-        
-        if(!clientesPorRut.containsKey(rut)) {
-            System.out.println("No se encuentra un cliente con ese rut");
-            return;
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== LISTA DE CLIENTES ===\n");
+
+        for (Cliente c : clientes) {
+            sb.append("Nombre: ").append(c.getNombre())
+              .append(", Edad: ").append(c.getEdad())
+              .append(", RUT: ").append(c.getRut()).append("\n");
+
+             // Creao un StringBuilder temporal para los contratos, esto podia ser con el tipico "i" 
+             //pero ya que estamos usando este tipo de ciclo, mejor ser consistente
+                StringBuilder contratosStr = new StringBuilder();
+            if (mostrarContratos && !c.getContratos().isEmpty()) {
+                sb.append("  Contratos:\n");
+
+                for (Contrato cont : c.getContratos()) {
+                    if (contratosStr.length() > 0){ //o sea que si el actual tiene 1 contrato o mas
+                        contratosStr.append(" | "); //es como en lo que finaliza, y como son varios contratos esto los separa
+                    }
+                    contratosStr.append("(").append(cont.getIdContrato())
+                               .append(",").append(cont.getEstado()).append(")");
+                }
+
+                sb.append("   - ").append(contratosStr.toString()).append("\n");
+            }
         }
-        
-        Cliente clienteEliminar = clientesPorRut.get(rut);
-        clientes.remove(clienteEliminar);
-        
-        clientesPorRut.remove(clienteEliminar.getRut());
-        
-        System.out.println("Cliente eliminado con exito: " +clienteEliminar.getNombre());
+        return sb.toString();
     }
+
     
-    static void actualizarCliente(
-            HashMap<String, Cliente> clientesPorRut,
-            BufferedReader lector
-    ) throws IOException {
-        
-        System.out.println("Ingresa el rut del cliente para actualizar sus datos: ");
-        String rutIngresado = lector.readLine();
-        Cliente cliente = clientesPorRut.get(rutIngresado);
-        
-        if(cliente == null) 
-            System.out.println("No existe un cliente con ese rut");
-        
-        System.out.println("Cliente encontrado: " + cliente.getNombre() + " (Edad: " + cliente.getEdad() + ")");
-        System.out.println("Que desea actualizar?");
-        System.out.println("1. Solo nombre");
-        System.out.println("2. Nombre y edad");
-        System.out.println("3. Nombre, edad y rut");
-    
-        int opcion = Integer.parseInt(lector.readLine());
+    public static boolean eliminarClientes(String rut) throws NoClienteException{
+   
+        if (clientesPorRut.containsKey(rut)){
+            Cliente clienteEliminar = clientesPorRut.get(rut);
+            clientes.remove(clienteEliminar);
+            clientesPorRut.remove(rut);
+            return true;
+            }
+        throw new NoClienteException(rut);
+    }
 
-        switch(opcion) {
-            
-            case 1:
-                System.out.println("Ingrese el nuevo nombre:");
-                String nuevoNombre = lector.readLine();
-                cliente.actualizarDatos(nuevoNombre);
-                System.out.println("Nombre actualizado correctamente.");
-                break;
-                
-            case 2:
-                System.out.println("Ingrese el nuevo nombre:");
-                nuevoNombre = lector.readLine();
-                System.out.println("Ingrese la nueva edad:");
-                int nuevaEdad = Integer.parseInt(lector.readLine());
-                cliente.actualizarDatos(nuevoNombre, nuevaEdad);
-                System.out.println("Datos actualizados correctamente.");
-                break;
-
-            case 3:
-                System.out.println("Ingrese el nuevo nombre:");
-                nuevoNombre = lector.readLine();
-                System.out.println("Ingrese la nueva edad:");
-                nuevaEdad = Integer.parseInt(lector.readLine());
-                System.out.println("Ingrese el nuevo rut:");
-                String nuevoRut = lector.readLine();
-                clientesPorRut.remove(cliente.getRut()); 
-                cliente.actualizarDatos(nuevoNombre, nuevaEdad, nuevoRut);
-                clientesPorRut.put(nuevoRut, cliente);
-                System.out.println("Datos actualizados correctamente (incluyendo rut).");
-                break;
-
-            default:
-                System.out.println("Opción inválida.");
+    public static boolean actualizarCliente(String rut, String nuevoNombre, int nuevaEdad) throws NoClienteException{
+        Cliente cliente = clientesPorRut.get(rut);
+        if (cliente == null) {
+            throw new NoClienteException(rut);
         }
+        cliente.actualizarDatos(nuevoNombre, nuevaEdad);
+        return true;
+    }
+
+    // ================= FUNCIONES PARA PLANES ================= //
+
+    public static boolean insertarPlan(int id, String tipo, String duracion, int precio) {
+        // Verificar ID repetido
+        for (Plan p : planesDisponibles) {
+            if (p.getIdPlan() == id) {
+                return false;
+            }
+        }
+        Plan nuevoPlan = new Plan(id, tipo, duracion, precio);
+        planesDisponibles.add(nuevoPlan);
+        return true; 
     }
     
-    public static void insertarPlan(BufferedReader br) throws IOException {
-        
-        boolean idRepetido;
-        int nuevoId;
-        do {
-            idRepetido = false;
-            System.out.println("Ingrese id para el plan:\n");        
-            nuevoId = Integer.parseInt(br.readLine());
-            
-            for(Plan p : planesDisponibles) {
-                if(p.getIdPlan() == nuevoId) {
-                    System.out.println("Este id ya existe...");
-                    idRepetido = true;
-                    break;
+    public static String listarPlanes() {
+        if (planesDisponibles.isEmpty()) {
+            return "No hay planes registrados.";
+        }
+
+        //el stringbuilder es como la forma que utilza la ventana para mostrar mensajes, es el printf
+        StringBuilder sb = new StringBuilder();
+        sb.append("=== LISTA DE PLANES ===\n");
+
+        for (Plan p : planesDisponibles) {
+            sb.append("ID: ").append(p.getIdPlan())
+              .append(", Tipo: ").append(p.getTipoPlan())
+              .append(", Duración: ").append(p.getDuracion())
+              .append(", Precio: ").append(p.getPrecio())
+              .append("\n");
+            }
+            return sb.toString();
+    }
+    
+    public static boolean eliminarPlan(int id) throws NoPlanException {
+    for (int i = 0; i < planesDisponibles.size(); i++) {
+        if (planesDisponibles.get(i).getIdPlan() == id) {
+            planesDisponibles.remove(i);
+            return true;
+            }
+        }
+        throw new NoPlanException(id); 
+    }
+    
+    public static boolean actualizarPlan(int id, String nuevoTipo, String nuevaDuracion, int nuevoPrecio) throws NoPlanException {
+        for (Plan p : planesDisponibles) { 
+            if (p.getIdPlan() == id) { //se encuentra y se hace todo lo bacan
+                p.setTipoPlan(nuevoTipo);
+                p.setDuracion(nuevaDuracion);
+                p.setPrecio(nuevoPrecio);
+                return true;
                 }
             }
-        } while(idRepetido);
-        
-        System.out.println("Ingrese tipo de plan(Prepago/Postpago/etc):\n");
-        String nuevoTipo = br.readLine();
-        System.out.println("Ingrese duracion del plan:\n");
-        String duracionPlan = br.readLine();
-        System.out.println("Ingrese precio del plan:\n");
-        int nuevoPrecio = Integer.parseInt(br.readLine());
-        Plan nuevoPlan = new Plan(nuevoId,nuevoTipo,duracionPlan,nuevoPrecio);
-        planesDisponibles.add(nuevoPlan);
-        System.out.println("Nuevo plan (" + nuevoId + ") insertado con exito...\n");
+        throw new NoPlanException(id); // no se encontró
     }
+
     
-    static void listarPlanes(
-            ArrayList<Plan> planes
-    ) throws IOException {
-        
-        if(planes.isEmpty()) 
-            System.out.println("No hay planes!");
-        
-        else {
-            System.out.println("=========== LISTA DE PLANES ===========");
-            for(Plan p : planesDisponibles) {
-                p.mostrarPlan();
+    // ================= FUNCIONES PARA CONTRATOS ================= //
+    
+    public static boolean insertarContrato(String rutCliente, int idContrato, int idPlan, String marca, String numero) {
+    Cliente cliente = clientesPorRut.get(rutCliente);
+    if (cliente == null) {
+        return false; 
+    }
+
+    // buscar plan que le quieres dar al contrato y producto, despues de todo un producto siempre esta linkeado a su contrato
+    // elegido por un tema de logica, de que me sirve tener un telefono que no tiene contrato en el sistema
+    Plan planElegido = null;
+    for (Plan p : planesDisponibles) {
+        if (p.getIdPlan() == idPlan) {
+            planElegido = p;
+            break;
+        }
+    }
+    if (planElegido == null) {
+        return false;
+    }
+    //por lo mencionado anteriormentes es porque se crea el producto en la misma funcion
+    Producto producto = new Producto(marca, numero);
+    Contrato nuevoContrato = new Contrato(idContrato, planElegido, producto, "Vigente");
+
+    cliente.agregarContrato(nuevoContrato);
+    return true; 
+    }
+
+    //lo mismo con los listar de clientes y de planes, en string
+    public static String listarContratos() {
+    if (clientes.isEmpty()) {
+        return "No hay clientes registrados.";
+    }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append("=== LISTA DE CONTRATOS ===\n");
+
+    boolean existen = false;
+    for (Cliente c : clientes) {
+        if (!c.getContratos().isEmpty()) {
+            //aqui no hay ni un problema todo es de facil accesos
+            sb.append("Cliente: ").append(c.getNombre()).append(" (").append(c.getRut()).append(")\n");
+            for (Contrato cont : c.getContratos()) {
+                //aqui se complica un poco, tengo que hacer gets de gets ya que tengo clases dentro de contrato
+                //entonces le hago get a producto y a plan
+                sb.append("   - Contrato ID: ").append(cont.getIdContrato()).append("\n");
+                sb.append("     Estado: ").append(cont.getEstado()).append("\n");
+                sb.append("     Plan: (").append(cont.getPlan().getIdPlan()).append(", ").append(cont.getPlan().getTipoPlan()).append(")\n");
+                sb.append("     Producto: (").append(cont.getProducto().getMarcaCelular()).append(", ").append(cont.getProducto().getNumeroCelular()).append(")\n");
+                sb.append("\n");
             }
-        }  
+            existen = true;
+        }
     }
+
+    if (!existen) {
+        return "No hay clientes con contratos registrados.";
+    }
+    return sb.toString();
+    }
+
     
-    static void eliminarPlanes(
-            ArrayList<Plan> planes,
-            BufferedReader lector
-    ) throws IOException {
-        
-        boolean encontrado = false;
-        int idEliminar, i;
-        
-        System.out.println("Ingresa el id del plan que quieres eliminar: ");
-        idEliminar = Integer.parseInt(lector.readLine());
-        
-        for(i=0; i<planes.size();i++) {
-            if(planes.get(i).getIdPlan() == idEliminar) {
-                planes.remove(i);
-                System.out.println("Plan removido con exito");
-                encontrado = true;
+    public static boolean eliminarContrato(String rutCliente, int idContrato) {
+        Cliente cliente = clientesPorRut.get(rutCliente);
+        if (cliente == null) {
+            return false; 
+        }
+
+        Contrato contratoEliminar = cliente.getMapaContratos().get(idContrato);
+        if (contratoEliminar == null) {
+            return false; 
+        }
+
+        cliente.getContratos().remove(contratoEliminar);
+        cliente.getMapaContratos().remove(idContrato);
+        return true; 
+        }
+
+        public static boolean actualizarContrato(String rutCliente, int idContrato, int nuevoIdPlan, String nuevaMarca, String nuevoNumero, String nuevoEstado) {
+        Cliente cliente = clientesPorRut.get(rutCliente);
+        if (cliente == null) {
+            return false; 
+        }
+
+        Contrato contrato = cliente.getMapaContratos().get(idContrato);
+        if (contrato == null) {
+            return false; 
+        }
+
+        // Buscar el nuevo plan
+        Plan planElegido = null;
+        for (Plan p : planesDisponibles) {
+            if (p.getIdPlan() == nuevoIdPlan) {
+                planElegido = p;
                 break;
             }
         }
-        
-        if(!encontrado)
-            System.out.println("No existe un plan con ese id");
-   
-    }
-    
-    static void insertarContrato(
-            ArrayList<Cliente> clientes,
-            ArrayList<Plan> planesDisponibles,
-            HashMap<String, Cliente> clientesPorRut,
-            BufferedReader lector
-            
-    ) throws IOException {
-        
-        System.out.println("Ingrese el rut del cliente que recibira el contrato: ");
-        String rutIngresado = lector.readLine();
-        Cliente clienteBuscado = clientesPorRut.get(rutIngresado);
-        
-        if(clienteBuscado == null) 
-            System.out.println("El cliente no existe, se cancela la insercion...");
-  
-        else {
-            System.out.println("Inserte ID del contrato: ");
-            int idNuevoContrato = Integer.parseInt(lector.readLine());
-            System.out.println("Planes disponibles: \n");
-            
-            for(int i = 0; i<planesDisponibles.size(); i++) {
-                Plan planActual = planesDisponibles.get(i);
-                System.out.println((i+1)+") ");
-                planActual.mostrarPlan();
-            }
-            
-            
-            System.out.println("Selecciona el plan por numero: ");
-            int opcionPlan = Integer.parseInt(lector.readLine());
-            Plan planElegido = planesDisponibles.get(opcionPlan-1);
-            
-            System.out.println("Ingresa la marca del celular: ");
-            String marcaCelular = lector.readLine();
-            
-            System.out.println("Ingresa el numero del celular: ");
-            String numeroCelular = lector.readLine();
-            
-            Producto productoElegido = new Producto(marcaCelular, numeroCelular);
-            
-            Contrato nuevoContrato = new Contrato(idNuevoContrato, planElegido, productoElegido, "Vigente");
-            
-            clienteBuscado.agregarContrato(nuevoContrato);
+        if (planElegido == null) {
+            return false;
         }
-    }
-    
-    static void listarContratos(ArrayList<Cliente> clientes) {
-        
-        if(clientes.isEmpty()) {
-            System.out.println("No hay clientes registrados");
-            return;
-        }
-        
-        boolean existenContratos = false;
-        System.out.println("====== LISTADO DE CONTRATOS =======");
-        for(Cliente c : clientes) {
-            if(!c.getContratos().isEmpty()) {
-                System.out.println("Cliente: " +c.getNombre()+ " (" +c.getRut()+ ")");
-                for(Contrato cont : c.getContratos())
-                    cont.mostrarContrato();
-                System.out.println("---------------------");
-                existenContratos = true;
-            }
-        }
-        
-        if(!existenContratos)
-            System.out.println("No hay clientes con contratos registrados");
-    }
-    
-    static void eliminarContrato(
-            HashMap<String, Cliente> clientesPorRut,
-            BufferedReader lector
-    ) throws IOException {
-        
-        System.out.println("Ingresa rut del cliente: ");
-        String rutIngresado = lector.readLine();
-        
-        Cliente cliente = clientesPorRut.get(rutIngresado);
-        if(cliente == null)
-            
-            System.out.println("No existe un cliente con ese rut");
-        
-        if (cliente.getContratos().isEmpty()) 
-            System.out.println("El cliente no tiene contratos.");
-        
-        System.out.println("Contratos del cliente " + cliente.getNombre() + ":");  
-        
-        for (Contrato c : cliente.getContratos()) 
-            c.mostrarContrato();
-    
-        System.out.println("Ingrese el ID del contrato a eliminar:");
-        int idEliminar = Integer.parseInt(lector.readLine());
-        Contrato contratoEliminar = cliente.getMapaContratos().get(idEliminar);
 
-        if (contratoEliminar == null) 
-            System.out.println("El contrato con ID " + idEliminar + " no existe en este cliente.");
-        
-        else {
-            cliente.getContratos().remove(contratoEliminar); 
-            cliente.getMapaContratos().remove(idEliminar);
-            System.out.println("Contrato eliminado correctamente.");
-        }
+        // Actualizar datos
+        contrato.setPlan(planElegido);
+        contrato.getProducto().setMarcaCelular(nuevaMarca);
+        contrato.getProducto().setNumeroCelular(nuevoNumero);
+        contrato.setEstado(nuevoEstado);
+
+        return true;
     }
+        
+    public static boolean cambiarEstadoContrato(String rutCliente, int idContrato, String nuevoEstado) {
+        Cliente cliente = clientesPorRut.get(rutCliente);
+        if (cliente == null) {
+            return false; // no existe cliente
+        }
+
+        Contrato contrato = cliente.getMapaContratos().get(idContrato);
+        if (contrato == null) {
+            return false; // no existe contrato
+        }
+
+        contrato.setEstado(nuevoEstado); // aquí solo cambiamos el estado
+        return true;
+    }
+
+// FUNCION EXTRA DE UTILIDAD // 
+    
+    //La logica del codigo es bastante simple, entre todos los planes que tengo guardados busco el que mas plata junta
+    //primero de todo recorre los planes, luego por cada plan recorre los clientes los cuales contienen los contratos
+    //hay mucho for entre for pero es muy simple, despues va comparando la id del plan actual con el del contrato
+    //si es el mismo se le suma al contador recaudado, al final de recorrerlos a todos compara el "recaudado" con el mayor
+    //igual esta hecho pa que si no hay un mayor, el primero nomas es el que queda como mayor, es muy estructura de datos esta funcion
+    //hice lo de siempre, que devuelva un string asi es mucho mas comodo en la ventana de planes
+    //asi muestra el mensaje altiro
+
+    public static String planMasRecaudador() {
+        if (planesDisponibles.isEmpty() || clientes.isEmpty()) {
+            return "No hay planes o clientes registrados.";
+        }
+
+        Plan planMayor = null;
+        int montoMayor = 0;
+
+        // recorrer todos los planes
+        for (Plan plan : planesDisponibles) {
+            int recaudado = 0;
+
+            // recorrer todos los clientes y sus contratos
+            for (Cliente c : clientes) {
+                for (Contrato cont : c.getContratos()) {
+                    if (cont.getPlan().getIdPlan() == plan.getIdPlan()) {
+                        recaudado += cont.getPlan().getPrecio();
+                    }
+                }
+            }
+
+            // verificar si este plan es mayor que el que teníamos
+            if (planMayor == null || recaudado > montoMayor) {
+                planMayor = plan;
+                montoMayor = recaudado;
+            }
+        }
+
+        if (planMayor == null) {
+            return "No se encontraron contratos asociados a los planes.";
+        }
+
+        return "El plan que más ha recaudado es:\n" +
+               "ID: " + planMayor.getIdPlan() +
+               ", Tipo: " + planMayor.getTipoPlan() +
+               ", Duración: " + planMayor.getDuracion() +
+               ", Precio: $" + planMayor.getPrecio() + "\n" +
+               "Recaudación total: $" + montoMayor;
+    }
+
+    
+// ------------------- MÉTODO MAIN -------------------    
     public static void main(String[] args) throws IOException {
 
-    //Inicializar datos de ejemplo
+    // Cargar datos iniciales de ejemplo
     datosEjemplo();
-
+ // Crear lector para leer desde consola
     BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
     
-    MostrarMenu menu = new MostrarMenu();
-
-    boolean salir = false;
-
-    while (!salir) {
-       
-        menu.principal();
-        System.out.println("Selecciona una opcion (1 a 4):");
-
-        int eleccion = Integer.parseInt(br.readLine());
-
-        switch (eleccion) {
-
-            
-            case 1:
-                boolean salirClientes = false;
-                while (!salirClientes) {
-                    menu.clientes(); 
-                    int opcionCliente = Integer.parseInt(br.readLine());
-
-                    switch (opcionCliente) {
-                        
-                        case 1:
-                            insertarCliente(br);
-                            break;
-                            
-                        case 2:
-                            listarClientes(clientes, br);
-                            break;
-                            
-                        case 3:
-                            eliminarClientes(clientes, clientesPorRut, br);
-                            break;
-                            
-                        case 4:
-                            actualizarCliente(clientesPorRut, br);
-                            break;
-                            
-                        case 5:
-                            salirClientes = true;
-                            break;
-                            
-                        default:
-                            System.out.println("Opcion Invalida...");
-                            break;
-                            
-                    }
-                }
-                break;
-                
-            case 2:
-                boolean salirPlan = false;
-                while (!salirPlan) {
-                    menu.planes(); 
-                    int opcionPlan = Integer.parseInt(br.readLine());
-
-                    switch (opcionPlan) {
-                        
-                        case 1:
-                            insertarPlan(br);
-                            break;
-                            
-                        case 2:
-                            listarPlanes(planesDisponibles);
-                            break;
-                            
-                        case 3:
-                            eliminarPlanes(planesDisponibles, br);
-                            break;
-                            
-                        case 4:
-                            salirPlan = true;
-                            break;
-                            
-                        default:
-                            System.out.println("Opcion invalida...");
-                            break;
-                    }
-                }
-                break;
-
-            case 3:
-                boolean salirContrato = false;
-                while (!salirContrato) {
-                    menu.contratos(); 
-                    int opcionContrato = Integer.parseInt(br.readLine());
-
-                    switch (opcionContrato) {
-                        
-                        case 1:
-                            insertarContrato(clientes, planesDisponibles, clientesPorRut, br);
-                            break;
-                            
-                        case 2:
-                            listarContratos(clientes);
-                            break;
-                            
-                        case 3:
-                            eliminarContrato(clientesPorRut, br);
-                            break;
-                            
-                        case 4:
-                            salirContrato = true;
-                            break;
-                            
-                        default:
-                            System.out.println("Opcion invalida...");
-                            break;
-                            
-                    }
-                }
-    
-            case 4:
-                System.out.println("Saliendo del sistema!");
-                salir = true; 
-                break;
-
-            default:
-                System.out.println("Opcion invalida...");
-                break;
-        }
-    }
+        SwingUtilities.invokeLater(() -> {
+            VentanaPrincipal ventana = new VentanaPrincipal();
+            ventana.mostrar();
+        });
   }
-    
 }
 
