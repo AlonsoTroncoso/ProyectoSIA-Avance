@@ -6,13 +6,80 @@ import java.util.*;
 import javax.swing.SwingUtilities;
 
 // ------------------- CLASE PRINCIPAL ------------------- //
-public class administrarContratos { 
-// Estructuras principales de almacenamiento  
+public class administrarContratos {
+    
+    private static final String RUTA_CLIENTES = "data/clientes.csv";
+    private static final String RUTA_PLANES = "data/planes.csv";
+    private static final String RUTA_CONTRATOS = "data/contratos.csv";
+    
+    // Estructuras principales de almacenamiento  
     static ArrayList<Cliente> clientes = new ArrayList(); // Lista de clientes
     static HashMap<String, Cliente> clientesPorRut = new HashMap(); // Búsqueda rápida por rut
     static ArrayList<Plan> planesDisponibles = new ArrayList(); // Lista de planes disponibles 
+    
+    
+    //Para generar el reporte de datos de clientes, planes, contratos
+    public static void generarReporteTabulado() {
+        try {
+            File folder = new File("data");
+            if (!folder.exists()) 
+                folder.mkdir();
+            BufferedWriter bw = new BufferedWriter(new FileWriter("data/reporte.txt"));
             
-    public static void datosEjemplo(){
+            // === PLANES ===
+            bw.write("=== PLANES ===\n");
+            bw.write(String.format("%-5s %-12s %-10s %-10s\n", "ID", "TIPO", "DURACION", "PRECIO"));
+            bw.write("--------------------------------------\n");
+            
+            if (planesDisponibles.isEmpty()) 
+                bw.write("No hay planes registrados.\n");
+            
+            else {
+                for (Plan p : planesDisponibles) {
+                    bw.write(String.format("%-5d %-12s %-10s $%-10d\n",
+                            p.getIdPlan(), p.getTipoPlan(), p.getDuracion(), p.getPrecio()));
+                }
+            }
+            bw.write("\n");
+            
+            // === CLIENTES ===
+            bw.write("=== CLIENTES ===\n");
+            bw.write(String.format("%-20s %-5s %-12s\n", "NOMBRE", "EDAD", "RUT"));
+            bw.write("--------------------------------------\n");
+            
+            if (clientes.isEmpty()) 
+            bw.write("No hay clientes registrados.\n\n");
+            
+            else {
+                for (Cliente c : clientes) {
+                    bw.write(String.format("%-20s %-5d %-12s\n", c.getNombre(), c.getEdad(), c.getRut()));
+                    
+                    if (!c.getContratos().isEmpty()) {
+                        bw.write("  Contratos:\n");
+                        bw.write(String.format("  %-5s %-10s %-5s %-12s %-15s\n", "ID", "ESTADO", "PLAN", "TIPO PLAN", "PRODUCTO"));
+                        bw.write("  -------------------------------------------------\n");
+                        
+                        for (Contrato cont : c.getContratos()) {
+                            bw.write(String.format("  %-5d %-10s %-5d %-12s %-15s (%s)\n",
+                                    cont.getIdContrato(),
+                                    cont.getEstado(),
+                                    cont.getPlan().getIdPlan(),
+                                    cont.getPlan().getTipoPlan(),
+                                    cont.getProducto().getMarcaCelular(),
+                                    cont.getProducto().getNumeroCelular()));
+                        }
+                        bw.write("\n");
+                    }
+                }
+            }
+            bw.close();
+            System.out.println("Reporte tabulado generado correctamente en data/reporte.txt");
+        } catch (IOException e) {
+            System.out.println("Error al generar el reporte: " + e.getMessage());
+        }
+    }
+    
+    /*public static void datosEjemplo(){
         
         Plan testPlan1 = new Plan(1,"Prepago", "30 días", 9990);
         Plan testPlan2 = new Plan(2,"Postpago", "12 meses", 15990);
@@ -48,7 +115,7 @@ public class administrarContratos {
         Contrato testContrato3 = new Contrato(1003, testPlan3, testProdu3, "Vigente");
         testCliente3.agregarContrato(testContrato3);
 
-    }
+    }*/
     
     // ================= FUNCIONES PARA CLIENTES ================= //
     
@@ -354,17 +421,173 @@ public class administrarContratos {
 
     
 // ------------------- MÉTODO MAIN -------------------    
-    public static void main(String[] args) throws IOException {
-
-    // Cargar datos iniciales de ejemplo
-    datosEjemplo();
- // Crear lector para leer desde consola
-    BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-    
+    public static void main(String[] args) {
+        cargarDatos(); // carga CSV al inicio
         SwingUtilities.invokeLater(() -> {
-            VentanaPrincipal ventana = new VentanaPrincipal();
-            ventana.mostrar();
+        VentanaPrincipal ventana = new VentanaPrincipal();
+        ventana.mostrar();
         });
-  }
+
+    // Puedes guardar datos al cerrar con un shutdown hook
+    Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+        guardarDatos();
+    }));
+}
+
+    
+    // --------------- CARGAR DATOS -------------------------
+    public static void cargarDatos() {
+        cargarClientes();
+        cargarPlanes();
+        cargarContratos();
+    }
+
+    public static void cargarClientes() {
+        File file = new File(RUTA_CLIENTES);
+        if (!file.exists()) 
+            return; // si no existe, nada que cargar
+        
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String linea;
+            while ((linea = br.readLine()) != null) {
+                String[] partes = linea.split(",");
+                if (partes.length == 3) {
+                    String nombre = partes[0];
+                    int edad = Integer.parseInt(partes[1]);
+                    String rut = partes[2];
+
+                    Cliente cliente = new Cliente(nombre, edad, rut);
+                    clientes.add(cliente);
+                    clientesPorRut.put(rut, cliente);
+                }
+            }
+            System.out.println("Clientes cargados correctamente.");
+        } catch (IOException e) {
+            System.out.println("Error al cargar clientes: " + e.getMessage());
+        }
+    }
+    
+    public static void cargarPlanes() {
+        File file = new File(RUTA_PLANES);
+        if (!file.exists())
+            return; // si no existe, nada que cargar
+
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String linea;
+            while ((linea = br.readLine()) != null) {
+                String[] partes = linea.split(",");
+                if (partes.length == 4) {
+                    int id = Integer.parseInt(partes[0]);
+                    String tipo = partes[1];
+                    String duracion = partes[2];
+                    int precio = Integer.parseInt(partes[3]);
+
+                    Plan plan = new Plan(id, tipo, duracion, precio);
+                    planesDisponibles.add(plan);
+                }
+            }
+            System.out.println("Planes cargados correctamente.");
+        } catch (IOException e) {
+            System.out.println("Error al cargar planes: " + e.getMessage());
+        }
+    }
+    
+    public static void cargarContratos() {
+        File file = new File(RUTA_CONTRATOS);
+        if (!file.exists()) 
+            return; // si no existe, nada que cargar
+        
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String linea;
+            while ((linea = br.readLine()) != null) {
+                String[] partes = linea.split(",");
+                if (partes.length == 6) {
+                    int idContrato = Integer.parseInt(partes[0]);
+                    String rutCliente = partes[1];
+                    int idPlan = Integer.parseInt(partes[2]);
+                    String marca = partes[3];
+                    String numero = partes[4];
+                    String estado = partes[5];
+                    // Crear contrato si existe el cliente y el plan
+                    insertarContrato(rutCliente, idContrato, idPlan, marca, numero);
+                    // Cambiar el estado si es distinto de "Vigente" (ya que insertarContrato pone "Vigente")
+                    cambiarEstadoContrato(rutCliente, idContrato, estado);
+                }
+            }
+            System.out.println("Contratos cargados correctamente.");
+        } catch (IOException e) {
+            System.out.println("Error al cargar contratos: " + e.getMessage());
+        }
+    }
+
+    // ---------------------GUARDAR DATOS-------------------
+    public static void guardarDatos() {
+        guardarClientes();
+        guardarPlanes();
+        guardarContratos();
+    }
+    
+    public static void guardarClientes() {
+        try {
+            File folder = new File("data");
+            if (!folder.exists()) 
+                folder.mkdir();
+
+            BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA_CLIENTES));
+            for (Cliente c : clientes) {
+                // Formato: nombre,edad,rut
+                bw.write(c.getNombre() + "," + c.getEdad() + "," + c.getRut());
+                bw.newLine();
+            }
+            bw.close();
+            System.out.println("Clientes guardados correctamente.");
+        } catch (IOException e) {
+            System.out.println("Error al guardar clientes: " + e.getMessage());
+        }
+    }
+
+    
+    public static void guardarPlanes() {
+        try {
+            File folder = new File("data");
+            if (!folder.exists()) folder.mkdir();
+            BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA_PLANES));
+            for (Plan p : planesDisponibles) {
+                // Formato: id,tipo,duracion,precio
+                bw.write(p.getIdPlan() + "," + p.getTipoPlan() + "," + p.getDuracion() + "," + p.getPrecio());
+                bw.newLine();
+            }
+            bw.close();
+            System.out.println("Planes guardados correctamente.");
+        } catch (IOException e) {
+            System.out.println("Error al guardar planes: " + e.getMessage());
+        }
+    }
+
+    
+    public static void guardarContratos() {
+        try {
+            File folder = new File("data");
+            if (!folder.exists()) 
+                folder.mkdir();
+            
+            BufferedWriter bw = new BufferedWriter(new FileWriter(RUTA_CONTRATOS));
+            for (Cliente c : clientes) {
+                for (Contrato cont : c.getContratos()) {
+                    // Formato: idContrato,rutCliente,idPlan,marca,numero,estado
+                    bw.write(cont.getIdContrato() + "," + c.getRut() + "," +
+                            cont.getPlan().getIdPlan() + "," +
+                            cont.getProducto().getMarcaCelular() + "," +
+                            cont.getProducto().getNumeroCelular() + "," +
+                            cont.getEstado());
+                    bw.newLine();
+                }
+            }
+            bw.close();
+            System.out.println("Contratos guardados correctamente.");
+        } catch (IOException e) {
+            System.out.println("Error al guardar contratos: " + e.getMessage());
+        }
+    }
 }
 
